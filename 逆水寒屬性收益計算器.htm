@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <title>逆水寒 PvP 屬性收益計算器</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #e67e22;
+            --bg: #f4f7f6;
+            --text-red: #e74c3c;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.2fr;
+            gap: 25px;
+        }
+
+        .column {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #eee;
+        }
+
+        .column-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        /* 輸入項樣式 */
+        .input-item {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .input-item label {
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        input {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            outline: none;
+            background: #fffdfb;
+        }
+
+        /* 結果顯示樣式 */
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed #eee;
+            font-size: 0.95em;
+        }
+
+        .res-label {
+            color: #666;
+        }
+
+        .res-value {
+            color: var(--text-red);
+            font-weight: bold;
+        }
+
+        .pool-box {
+            background: #fff8e1;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid #ffe082;
+        }
+
+        .eval-box {
+            background: var(--primary);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .eval-score {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #f1c40f;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>逆水寒 PvP 屬性收益計算器</h1>
+
+        <div class="main-layout">
+            <div class="column">
+                <div class="column-title">我方屬性 (黑字輸入)</div>
+                <div id="my-inputs"></div>
+            </div>
+
+            <div class="column">
+                <div class="column-title">敵方面板 (黑字輸入)</div>
+                <div id="opp-inputs"></div>
+            </div>
+
+            <div class="column" style="background: #fff;">
+                <div class="column-title">計算結果分析 (自動)</div>
+                <div id="results-display"></div>
+
+                <div class="pool-box">
+                    <div class="result-item">第一乘區: <span class="res-value" id="res-m1">0</span></div>
+                    <div class="result-item">第二乘區: <span class="res-value" style="color:#7f8c8d">見說明</span></div>
+                    <div class="result-item">第三乘區: <span class="res-value" id="res-m3">0</span></div>
+                    <p style="font-size: 11px; color: #95a5a6; margin-top: 10px;">*第二乘區需考慮內功/打造/特質等，暫不計入</p>
+                </div>
+
+                <div class="eval-box">
+                    <div>最終攻擊評估</div>
+                    <div class="eval-score" id="res-eval">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. 定義所有欄位
+        const myFields = [
+            { id: 'atk', n: '攻擊', v: 10000 }, { id: 'pierce', n: '破防', v: 9000 },
+            { id: 'ele', n: '元素', v: 3000 }, { id: 'ele_ign', n: '元素忽視', v: 1500 },
+            { id: 'crit', n: '會心', v: 4000 }, { id: 'hit', n: '命中', v: 2000 },
+            { id: 'sh_brk', n: '破盾', v: 300 }, { id: 'cls_ext', n: '流派克制', v: 5000 },
+            { id: 'cls_ext_p', n: '流派克制%', v: 11 }, { id: 'crit_dmg', n: '會心傷害%', v: 170 }
+        ];
+
+        const oppFields = [
+            { id: 'def', n: '防禦', v: 12000 }, { id: 'ele_res', n: '元素抗', v: 2500 },
+            { id: 'crit_res', n: '會心抗', v: 2000 }, { id: 'block', n: '格擋', v: 1800 },
+            { id: 'sh', n: '氣盾', v: 1000 }, { id: 'cls_res', n: '流派抵禦', v: 5500 },
+            { id: 'cls_res_p', n: '流派抵禦%', v: 22 }, { id: 'crit_def', n: '會心防禦%', v: 15 }
+        ];
+
+        const resultsList = [
+            '防禦減傷%', '防禦穿透率%', '元素減傷%', '元素穿透率%', '會心率%', '命中率%',
+            '剩餘氣盾', '剩餘克制', '剩餘抵禦%', '剩餘會傷%', '攻克池', '元素池', '攻克池%', '元素池%'
+        ];
+
+        // 初始化介面
+        function init() {
+            const myContainer = document.getElementById('my-inputs');
+            myFields.forEach(f => {
+                myContainer.innerHTML += `<div class="input-item"><label>${f.n}</label><input type="number" id="m_${f.id}" value="${f.v}" oninput="calc()"></div>`;
+            });
+
+            const oppContainer = document.getElementById('opp-inputs');
+            oppFields.forEach(f => {
+                oppContainer.innerHTML += `<div class="input-item"><label>${f.n}</label><input type="number" id="o_${f.id}" value="${f.v}" oninput="calc()"></div>`;
+            });
+
+            const resContainer = document.getElementById('results-display');
+            resultsList.forEach(r => {
+                resContainer.innerHTML += `<div class="result-item"><span class="res-label">${r}</span><span class="res-value" id="r_${r}">0</span></div>`;
+            });
+            calc();
+        }
+
+        // 核心計算公式
+        function calc() {
+            const getV = (id, prefix) => parseFloat(document.getElementById(prefix + id).value) || 0;
+
+            // 獲取數值
+            const M = {}; myFields.forEach(f => M[f.id] = getV(f.id, 'm_'));
+            const O = {}; oppFields.forEach(f => O[f.id] = getV(f.id, 'o_'));
+
+            // --- 1. 防禦與元素 ---
+            const defRed = Math.max(0, (O.def - M.pierce) / (O.def - M.pierce + 10743));
+            const defPen = 1 - defRed;
+
+            const eleRed = Math.max(0, (O.ele_res - M.ele_ign) / (O.ele_res - M.ele_ign + 2016));
+            const elePen = 1 - eleRed;
+
+            // --- 2. 會心與命中 ---
+            const critRate = Math.max(0, (1.1445 * (M.crit - O.crit_res) + 80) / (M.crit - O.crit_res + 1602.5));
+            const hitRate = Math.max(0, (2.3804 * (M.hit - O.block) + 5744) / (M.hit - O.block + 6046));
+
+            // --- 3. 剩餘氣盾 ---
+            let remShield = 0;
+            if (M.sh_brk <= (1 / 3) * O.sh) {
+                remShield = O.sh - 2 * M.sh_brk;
+            } else {
+                remShield = 0.5 * (O.sh - M.sh_brk);
+            }
+
+            // --- 4. 其他剩餘屬性 ---
+            const remCls = M.cls_ext - O.cls_res;
+            const remResP = (O.cls_res_p - M.cls_ext_p) / 100;
+            const remCritDmgP = (M.crit_dmg - O.crit_def) / 100;
+
+            // --- 5. 攻克池與元素池 ---
+            const atkPool = (M.atk - remShield + remCls) * defPen;
+            const elePool = M.ele * elePen;
+            const totalPool = atkPool + elePool;
+
+            const atkPoolPct = totalPool > 0 ? (atkPool / totalPool) : 0;
+            const elePoolPct = totalPool > 0 ? (elePool / totalPool) : 0;
+
+            // --- 6. 乘區計算 ---
+            const m1 = totalPool;
+            // 第三乘區公式
+            const m3 = hitRate * (critRate * remCritDmgP + (1 - critRate)) + (1 - hitRate) * 0.5;
+
+            // 最終評估：第一乘區 * 第三乘區
+            const finalEval = m1 * m3;
+
+            // --- 7. 渲染到畫面 (包含 % 修正) ---
+            const setR = (name, val, isPct = false) => {
+                document.getElementById('r_' + name).innerText = isPct ? (val * 100).toFixed(2) + '%' : val.toFixed(2);
+            };
+
+            setR('防禦減傷%', defRed, true);
+            setR('防禦穿透率%', defPen, true);
+            setR('元素減傷%', eleRed, true);
+            setR('元素穿透率%', elePen, true);
+            setR('會心率%', critRate, true);
+            setR('命中率%', hitRate, true);
+            setR('剩餘氣盾', remShield);
+            setR('剩餘克制', remCls);
+            setR('剩餘抵禦%', remResP, true);
+            setR('剩餘會傷%', remCritDmgP, true);
+            setR('攻克池', atkPool);
+            setR('元素池', elePool);
+            setR('攻克池%', atkPoolPct, true);
+            setR('元素池%', elePoolPct, true);
+
+            // 更新乘區顯示
+            document.getElementById('res-m1').innerText = m1.toFixed(2);
+            // 這裡將第三乘區改為 % 顯示
+            document.getElementById('res-m3').innerText = (m3 * 100).toFixed(2) + '%';
+
+            // 最終評估顯示
+            document.getElementById('res-eval').innerText = Math.round(finalEval).toLocaleString();
+        }
+
+        window.onload = init;
+    </script>
+
+</body>
+
+</html>
